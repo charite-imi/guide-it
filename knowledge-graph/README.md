@@ -33,3 +33,4 @@ https://github.com/innolitics/dicom-standard/blob/master/standard/ciod_to_module
 - Alaa: Erste Metrik implementieren
 - Heiko: Marc ansprechen wg. Datensatz
 - https://mie2025.efmi.org/
+- https://arxiv.org/abs/2211.10011
