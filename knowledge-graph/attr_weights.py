@@ -19,12 +19,21 @@ def add_nodes(graph, nodes, node_type):
 
 def add_edges(graph, relationships, from_type, to_type, edge_attrs):
 
-    normlize = lambda tag: tag.replace('(', '').replace(')', '').replace(',', '').lower()
+    # normlize = lambda tag: tag.replace('(', '').replace(')', '').replace(',', '').lower()
     
     for relation in relationships:
-
-        from_id = f"ciod_{relation[from_type]}" if from_type == "ciodId" else f"module_{relation[from_type]}" 
-        to_id = f"module_{relation[to_type]}" if from_type=="ciodId" else f"attribute_{normlize(relation[to_type])}"
+        
+        if from_type=="ciodId":
+            from_id = f"ciod_{relation[from_type]}"
+            to_id = f"module_{relation[to_type]}"  
+        else:
+            from_id = f"module_{relation[from_type]}" 
+            tmp = relation[to_type].split(":")
+            if len(tmp) == 2:
+                to_id = f"attribute_{tmp[1]}"
+            else:
+                continue
+        
         relationship_attrs = {key: relation[key] for key in edge_attrs if key in relation}
 
         graph.add_edge(
@@ -49,10 +58,13 @@ def build_dicom_graph(ciods_file, modules_file, attributes_file, ciod_to_modules
 
     add_edges(G, ciod_to_modules, "ciodId", "moduleId", ["usage", "conditionalStatement", "informationEntity"])
 
-    add_edges(G, module_to_attributes, "moduleId", "tag", ["type", "linkToStandard", "description"])
+    add_edges(G, module_to_attributes, "moduleId", "path", ["type", "linkToStandard", "description"])
 
     return G
 
+def get_attribute_name(graph, attribute_id):
+    return graph.nodes[attribute_id]['name'] if graph.has_node(attribute_id) else None
+    
 def create_lookup_table(graph, node_type):
     lookup_table = dict()
     node_ids = sorted([node_id for node_id, data in graph.nodes(data=True) if data.get('type') == node_type])
@@ -141,8 +153,7 @@ if __name__ == "__main__":
                                                   attr="usage",
                                                   weighting=weighting)
 
-    # weighting = {"1": 4, "1C": 3, "2":2, "2C":1, "3":0}
-    weighting = {"1":2, "2":2, "1C": 1, "2C":1, "3":0}
+    weighting = {"1":4, "2":3, "1C": 2, "2C":1, "3":0}
     modules_attributes_matrix = get_relationship_matrix(graph=dicom_graph, 
                                                   source_node_type="module",
                                                   target_node_type="attribute",
@@ -158,11 +169,18 @@ if __name__ == "__main__":
 
     # ciod_w = np.ones(len(lookup_table_ciod))
     ciod_w = np.zeros(len(lookup_table_ciod))
-    ciod_w[27] = 1
+    ciod_w[29] = 1 #CT
+    ciod_w[77] = 1 #MRI
 
     attributes_w = ciods_attributes_matrix @ ciod_w
 
     indices_sorted = np.argsort(attributes_w)[::-1]
     values = attributes_w[indices_sorted]
+    weights = values/values.sum()
     attributes_keys = [key for key, value in lookup_table_attribute.items() if value in list(indices_sorted[:10])]
-    print(attributes_keys)
+    
+    attr_names = [get_attribute_name(dicom_graph, attribute_key) for attribute_key in attributes_keys]
+    
+    print(attr_names)
+    print(weights)
+        
